@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Transcribe - Транскрипция аудио и видео</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/realtime.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Заголовок -->
+        <header class="header">
+            <div class="header-main">
+                <h1><i class="fas fa-microphone"></i> whisperx-fronted-docker-compose - AI Транскрипция</h1>
+        <p>Персональная система транскрипции с локальным хранением результатов — загрузите аудио или видео файл для получения транскрипции</p>
+            </div>
+        </header>
+
+        <!-- Секция загрузки -->
+        <section class="upload-section" id="uploadSection">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-content">
+                    <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                    <h3>Перетащите файл сюда или нажмите для выбора</h3>
+                    <p>Поддерживаются: MP3, M4A, WAV, MP4, AVI, MKV и другие<br>
+                    Экспорт в 6 форматах: JSON, SRT, VTT, TSV, DOCX, PDF<br>
+                    <strong>💾 Файлы сохраняются локально и доступны через API</strong></p>
+                    <input type="file" id="fileInput" accept="audio/*,video/*" hidden>
+                    <div class="upload-buttons">
+                        <button class="btn btn-primary" id="selectFileBtn">
+                            <i class="fas fa-folder-open"></i> Выбрать файл
+                        </button>
+                        <button class="btn btn-realtime" id="realtime-btn-main">
+                            <i class="fas fa-microphone"></i> Real-Time транскрипция
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Настройки транскрипции -->
+            <div class="settings-panel" id="settingsPanel" style="display: none;">
+                <h3><i class="fas fa-cog"></i> Настройки транскрипции</h3>
+                <div class="settings-grid">
+                    <div class="setting-item">
+                        <label for="modelSelect">Модель:</label>
+                        <select id="modelSelect">
+                            <option value="large-v3">Large-v3 (лучшее качество)</option>
+                            <option value="medium">Medium (быстрее)</option>
+                            <option value="small">Small (самый быстрый)</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label for="languageSelect">Язык:</label>
+                        <select id="languageSelect">
+                            <option value="ru">Русский</option>
+                            <option value="en">English</option>
+                            <option value="auto">Автоопределение</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <div class="toggle-setting">
+                            <span class="toggle-label">
+                                <i class="fas fa-users"></i> Разделение спикеров
+                            </span>
+                            <button class="diarize-toggle-btn" id="diarizeToggle" type="button">
+                                <input type="checkbox" id="diarizeCheck">
+                                <i class="fas fa-toggle-off" id="diarizeIcon"></i>
+                                <span id="diarizeText">ВЫКЛ</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="transcription-buttons">
+                    <button class="btn btn-success" id="startTranscription">
+                        <i class="fas fa-play"></i> Начать транскрипцию
+                    </button>
+                    <button class="btn btn-realtime" id="realtime-btn">
+                        <i class="fas fa-microphone"></i> Real-Time
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Секция прогресса -->
+        <section class="progress-section" id="progressSection" style="display: none;">
+            <div class="progress-card">
+                <h3><i class="fas fa-spinner fa-spin"></i> Обработка файла</h3>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <p class="progress-text" id="progressText">Подготовка к обработке...</p>
+                <div class="task-info">
+                    <p><strong>Файл:</strong> <span id="fileName"></span></p>
+                    <p><strong>ID задачи:</strong> <span id="taskId"></span></p>
+                </div>
+                <div class="progress-actions">
+                    <button class="btn btn-danger" id="cancelTranscription">
+                        <i class="fas fa-times"></i> Отменить
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Секция результатов -->
+        <section class="results-section" id="resultsSection" style="display: none;">
+            <div class="results-header">
+                <h2><i class="fas fa-check-circle"></i> Транскрипция завершена</h2>
+            </div>
+
+            <!-- Медиаплеер -->
+            <div class="media-player">
+                <audio id="audioPlayer" controls style="width: 100%; margin-bottom: 20px;">
+                    Ваш браузер не поддерживает аудио элемент.
+                </audio>
+                <video id="videoPlayer" controls style="width: 100%; margin-bottom: 20px; display: none;">
+                    Ваш браузер не поддерживает видео элемент.
+                </video>
+            </div>
+
+            <!-- Транскрипт с синхронизацией -->
+            <div class="transcript-container">
+                <div class="transcript-header">
+                    <h3><i class="fas fa-align-left"></i> Транскрипт</h3>
+                    <div class="transcript-controls">
+                        <button class="btn btn-small" id="toggleAutoScroll">
+                            <i class="fas fa-arrows-alt-v"></i> Авто-прокрутка
+                        </button>
+                        <button class="btn btn-small" id="toggleTimestamps">
+                            <i class="fas fa-clock"></i> Временные метки
+                        </button>
+                    </div>
+                </div>
+                <div class="transcript-content" id="transcriptContent">
+                    <!-- Сегменты транскрипта будут добавлены динамически -->
+                </div>
+            </div>
+
+            <!-- Свернутая секция скачивания -->
+            <div class="downloads-collapsible" id="downloadsCollapsible" style="display: none;">
+                <div class="downloads-header" onclick="toggleDownloadsMenu()">
+                    <div class="downloads-header-content">
+                        <div class="downloads-title">
+                            <i class="fas fa-cloud-download-alt"></i>
+                            <h3>Скачать файлы</h3>
+                            <span class="downloads-count" id="downloadsCount">(0 файлов)</span>
+                        </div>
+                        <div class="downloads-toggle">
+                            <i class="fas fa-chevron-down" id="downloadsChevron"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="downloads-content" id="downloadsContent">
+                    <div class="s3-links-grid" id="s3LinksGrid">
+                        <!-- Ссылки на файлы будут добавлены динамически -->
+                    </div>
+                    <p class="s3-info">
+                        <i class="fas fa-info-circle"></i>
+                        Все файлы сохраняются локально, доступны через API и организованы по категориям для удобного доступа.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Секция истории -->
+        <section class="history-section">
+            <h3><i class="fas fa-history"></i> История транскрипций</h3>
+            <div class="history-list" id="historyList">
+                <!-- История будет загружена динамически -->
+            </div>
+        </section>
+    </div>
+
+    <!-- Модальное окно для ошибок -->
+    <div class="modal" id="errorModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-exclamation-triangle"></i> Ошибка</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="errorMessage"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="closeModal()">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Подключение модулей -->
+    <script src="cache_version.js"></script>
+    <script src="config.js?v=1736462000"></script>
+    <script src="debug_config.js"></script>
+    <script src="modules/api.js?v=1736462100"></script>
+    <script src="modules/ui.js"></script>
+    <script src="modules/fileHandler.js"></script>
+    <script src="modules/transcription.js"></script>
+    <script src="modules/mediaPlayer.js"></script>
+    <script src="modules/transcript.js"></script>
+    <script src="modules/history.js"></script>
+    <script src="modules/downloads.js"></script>
+    <script src="modules/summarization.js"></script>
+    <script src="modules/realtimeAudio.js"></script>
+    <script src="modules/realtimeUI.js"></script>
+    <script src="modules/main.js"></script>
+</body>
+</html> 
