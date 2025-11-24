@@ -12,6 +12,8 @@ import whisperx
 from ..models.schemas import TranscriptionConfig
 from ..utils import DependencyValidationError, validate_whisperx_dependencies
 from .summarization_manager import SummarizationManager
+from .diarization_manager import DiarizationManager
+from .alignment_manager import AlignmentManager
 
 
 class WhisperManager:
@@ -19,18 +21,21 @@ class WhisperManager:
     
     def __init__(self):
         self.model = None
-        self.align_model = None
-        self.align_metadata = None
-        self.diarize_model = None
         self.models_loaded = False
         self.loading_lock = threading.Lock()
         self.device = self._detect_device()
         self.compute_type = self._detect_compute_type()
         
-        # Инициализируем менеджер суммаризации
+        # Инициализируем менеджеры
         self.summarization_manager = SummarizationManager(
             device=self.device,
             compute_type=self.compute_type
+        )
+        self.diarization_manager = DiarizationManager(
+            device=self.device
+        )
+        self.alignment_manager = AlignmentManager(
+            device=self.device
         )
         
         print(f"🔧 Обнаружено устройство: {self.device}, compute_type: {self.compute_type}")
@@ -86,42 +91,17 @@ class WhisperManager:
                 compute_type=compute_type
             )
             
-            if status_callback:
-                status_callback("loading_align_model", "Загрузка модели выравнивания...", 25)
-            print("🔧 Загрузка модели выравнивания...")
+            # Загружаем модель выравнивания
+            self.alignment_manager.load_model(
+                language=config.language,
+                status_callback=status_callback
+            )
             
-            # Попытка загрузить модель выравнивания с обработкой ошибок
-            try:
-                self.align_model, self.align_metadata = whisperx.load_align_model(
-                    language_code=config.language, 
-                    device=self.device
-                )
-            except Exception as e:
-                print(f"⚠️ Не удалось загрузить модель выравнивания для языка '{config.language}': {e}")
-                print("🔧 Попытка загрузить универсальную модель выравнивания...")
-                try:
-                    # Попробуем загрузить для английского языка как fallback
-                    self.align_model, self.align_metadata = whisperx.load_align_model(
-                        language_code="en", 
-                        device=self.device
-                    )
-                    print("✅ Загружена английская модель выравнивания как fallback")
-                except Exception as e2:
-                    print(f"❌ Не удалось загрузить модель выравнивания: {e2}")
-                    print("⚠️ Транскрипция будет выполнена без точного выравнивания временных меток")
-                    self.align_model = None
-                    self.align_metadata = None
-            
+            # Загружаем модель диаризации если нужно
             if config.diarize and config.hf_token:
-                if status_callback:
-                    status_callback("loading_diarize_model", "Загрузка модели диаризации...", 28)
-                print("🔧 Загрузка модели диаризации...")
-                print(f"🔑 HF Token для диаризации: {config.hf_token[:20]}...{config.hf_token[-10:] if len(config.hf_token) > 30 else config.hf_token}")
-                print(f"🔑 Длина токена: {len(config.hf_token)} символов")
-                print(f"🔑 Токен начинается с 'hf_': {config.hf_token.startswith('hf_')}")
-                self.diarize_model = whisperx.diarize.DiarizationPipeline(
-                    use_auth_token=config.hf_token, 
-                    device=self.device
+                self.diarization_manager.load_model(
+                    hf_token=config.hf_token,
+                    status_callback=status_callback
                 )
             
             self.models_loaded = True
@@ -174,24 +154,18 @@ class WhisperManager:
         result = self.model.transcribe(audio, batch_size=config.batch_size, language=config.language)
         
         # Выравнивание
-        if self.align_model and self.align_metadata:
-            if status_callback:
-                status_callback("aligning", "Выравнивание текста...", 65)
-            print("📐 Выравнивание текста...")
-            result = whisperx.align(
+        if self.alignment_manager.is_loaded:
+            result = self.alignment_manager.align(
                 result["segments"], 
-                self.align_model, 
-                self.align_metadata, 
-                audio, 
-                self.device
+                audio,
+                status_callback
             )
         
         # Диаризация (если включена)
-        if config.diarize and self.diarize_model:
+        if config.diarize and self.diarization_manager.is_loaded:
             if status_callback:
                 status_callback("diarizing", "Диаризация спикеров...", 72)
-            print("👥 Диаризация спикеров...")
-            diarize_segments = self.diarize_model(audio)
+            diarize_segments = self.diarization_manager.diarize(audio)
             result = whisperx.assign_word_speakers(diarize_segments, result)
         
         return result
