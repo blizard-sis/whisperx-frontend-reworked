@@ -110,7 +110,7 @@ class WhisperManager:
                 audio_data = scipy.signal.resample(audio_data, target_length)
             
             # Транскрибируем аудио чанк
-            result = self.model.transcribe(audio_data, batch_size=1)
+            result = self.model.transcribe(audio_data, batch_size=1, language=language)
             
             # Извлекаем текст из результата
             if result and "segments" in result and result["segments"]:
