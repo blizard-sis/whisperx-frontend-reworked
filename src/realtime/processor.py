@@ -238,7 +238,7 @@ class StreamingAudioProcessor:
             logger.debug(f"Interim processing segment {self.current_segment}: {current_duration:.1f}ms accumulated audio")
             
             # Вызов WhisperX для промежуточной транскрипции накопленного аудио
-            result = await self.whisper_manager.transcribe_audio_chunk(
+            result = await self.whisper_manager.transcribe_chunk(
                 audio_data=audio_data,
                 sample_rate=self.config.sample_rate,
                 language=self.config.language
@@ -277,7 +277,7 @@ class StreamingAudioProcessor:
             logger.info(f"Final processing of segment {self.current_segment}: {current_duration:.1f}ms total audio")
             
             # Финальная транскрипция всего 30-секундного сегмента
-            result = await self.whisper_manager.transcribe_audio_chunk(
+            result = await self.whisper_manager.transcribe_chunk(
                 audio_data=audio_data,
                 sample_rate=self.config.sample_rate,
                 language=self.config.language

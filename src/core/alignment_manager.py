@@ -8,7 +8,7 @@ from typing import Optional, Callable, Tuple, Any
 class AlignmentManager:
     """Менеджер для работы с моделью выравнивания временных меток"""
     
-    def __init__(self, device: str = "cuda"):
+    def __init__(self, device: str):
         """
         Инициализация менеджера выравнивания
         

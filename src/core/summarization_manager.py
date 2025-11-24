@@ -12,7 +12,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 class SummarizationManager:
     """Менеджер для работы с моделью суммаризации"""
     
-    def __init__(self, device: str = "cuda", compute_type: str = "float16"):
+    def __init__(self, device: str, compute_type: str):
         """
         Инициализация менеджера суммаризации
         

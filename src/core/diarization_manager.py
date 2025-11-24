@@ -8,7 +8,7 @@ from typing import Optional, Callable
 class DiarizationManager:
     """Менеджер для работы с моделью диаризации спикеров"""
     
-    def __init__(self, device: str = "cuda"):
+    def __init__(self, device: str):
         """
         Инициализация менеджера диаризации
         

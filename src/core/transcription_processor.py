@@ -12,18 +12,64 @@ from ..models.schemas import TranscriptionConfig
 from ..services.subtitle_generator import SubtitleGenerator
 from ..services.database_service import DatabaseService
 from ..core.whisper_manager import WhisperManager
+from ..core.alignment_manager import AlignmentManager
+from ..core.diarization_manager import DiarizationManager
+from ..core.summarization_manager import SummarizationManager
 from ..config.settings import UPLOADS_DIR, TEMP_DIR, TRANSCRIPTS_DIR, PROCESSING_CONFIG
+import whisperx
+import torch
 
 
 class TranscriptionProcessor:
     """Основной процессор транскрипции"""
     
     def __init__(self):
-        self.whisper_manager = WhisperManager()
+        # Определяем устройство и compute_type для всех моделей
+        self.device = self._detect_device()
+        self.compute_type = self._detect_compute_type()
+        
+        print(f"🖥️ TranscriptionProcessor: device={self.device}, compute_type={self.compute_type}")
+        
+        # Инициализируем все менеджеры с общими параметрами
+        self.whisper_manager = WhisperManager(
+            device=self.device,
+            compute_type=self.compute_type
+        )
+        self.alignment_manager = AlignmentManager(device=self.device)
+        self.diarization_manager = DiarizationManager(device=self.device)
+        self.summarization_manager = SummarizationManager(
+            device=self.device,
+            compute_type=self.compute_type
+        )
+        
+        # Сервисы
         self.subtitle_generator = SubtitleGenerator()
         self.db_service = DatabaseService()
         self.executor = ThreadPoolExecutor(max_workers=PROCESSING_CONFIG['max_workers'])
         self.task_statuses = {}  # Статусы задач в памяти
+        
+        print("🎬 TranscriptionProcessor инициализирован со всеми менеджерами")
+    
+    def _detect_device(self) -> str:
+        """Определение доступного устройства для всех моделей"""
+        if torch.cuda.is_available():
+            return "cuda"
+        else:
+            return "cpu"
+    
+    def _detect_compute_type(self) -> str:
+        """Автоматическое определение compute_type для всех моделей"""
+        if self.device == "cuda":
+            # Проверяем поддержку float16 на GPU
+            try:
+                # Пробуем создать тензор float16 на GPU
+                test_tensor = torch.tensor([1.0], dtype=torch.float16, device="cuda")
+                return "float16"
+            except Exception:
+                return "float32"
+        else:
+            # Для CPU используем int8 для лучшей производительности
+            return "int8"
     
     def update_task_status(self, task_id: str, status: str, progress: str = None, error: str = None, progress_percent: int = None):
         """Обновление статуса задачи"""
@@ -85,19 +131,60 @@ class TranscriptionProcessor:
                 processing_file = file_path
             
             # Этап 3: Загрузка моделей (20-30%)
-            self.update_task_status(task_id, "loading_models", "Загрузка моделей WhisperX...", progress_percent=25)
-            if not self.whisper_manager.is_loaded:
-                # Создаем callback для обновления статуса
-                def status_callback(status, message, percent):
-                    self.update_task_status(task_id, status, message, progress_percent=percent)
-                
-                self.whisper_manager.load_models(config, status_callback)
+            self.update_task_status(task_id, "loading_models", "Загрузка моделей...", progress_percent=22)
             
-            # Этап 4-7: Транскрипция с детальными статусами (30-75%)
-            def transcription_callback(status, message, percent):
+            # Создаем callback для обновления статуса
+            def status_callback(status, message, percent):
                 self.update_task_status(task_id, status, message, progress_percent=percent)
             
-            result = self.whisper_manager.transcribe_audio(str(processing_file), config, transcription_callback)
+            # Загружаем Whisper
+            if not self.whisper_manager.is_loaded:
+                self.whisper_manager.load_model(
+                    model_name=config.model,
+                    compute_type=config.compute_type,
+                    status_callback=status_callback
+                )
+            
+            # Загружаем Alignment
+            if not self.alignment_manager.is_loaded:
+                self.alignment_manager.load_model(
+                    language=config.language,
+                    status_callback=status_callback
+                )
+            
+            # Загружаем Diarization если нужно
+            if config.diarize and config.hf_token and not self.diarization_manager.is_loaded:
+                self.diarization_manager.load_model(
+                    hf_token=config.hf_token,
+                    status_callback=status_callback
+                )
+            
+            # Этап 4: Загрузка аудио (30-35%)
+            self.update_task_status(task_id, "loading_audio", "Загрузка аудио файла...", progress_percent=32)
+            print(f"🎵 Загрузка аудио файла: {processing_file}")
+            audio = whisperx.load_audio(str(processing_file))
+            
+            # Этап 5: Транскрипция (35-60%)
+            result = self.whisper_manager.transcribe(
+                audio=audio,
+                batch_size=config.batch_size,
+                language=config.language,
+                status_callback=status_callback
+            )
+            
+            # Этап 6: Выравнивание (60-70%)
+            if self.alignment_manager.is_loaded:
+                result = self.alignment_manager.align(
+                    segments=result["segments"],
+                    audio=audio,
+                    status_callback=status_callback
+                )
+            
+            # Этап 7: Диаризация (70-75%)
+            if config.diarize and self.diarization_manager.is_loaded:
+                self.update_task_status(task_id, "diarizing", "Диаризация спикеров...", progress_percent=72)
+                diarize_segments = self.diarization_manager.diarize(audio)
+                result = whisperx.assign_word_speakers(diarize_segments, result)
             
             # Добавляем метаданные
             result["created_at"] = datetime.now().isoformat()
@@ -105,7 +192,7 @@ class TranscriptionProcessor:
             result["original_filename"] = original_filename
             result["language"] = config.language
             
-            # Этап 7.5: Суммаризация (75-80%)
+            # Этап 8: Суммаризация (75-80%)
             try:
                 self.update_task_status(task_id, "summarizing", "Создание суммаризации...", progress_percent=76)
                 print(f"🤖 Запуск локальной суммаризации для {task_id}")
@@ -113,7 +200,7 @@ class TranscriptionProcessor:
                 def summarization_callback(status, message, percent):
                     self.update_task_status(task_id, status, message, progress_percent=percent)
                 
-                summary = self.whisper_manager.create_summary(result, summarization_callback)
+                summary = self.summarization_manager.create_summary(result, summarization_callback)
                 result["summary"] = summary
                 print(f"✅ Суммаризация завершена для {task_id}")
                 print(f"📝 Содержимое суммаризации: {summary}")
@@ -123,14 +210,14 @@ class TranscriptionProcessor:
                 print(traceback.format_exc())
                 result["summary"] = None
             
-            # Этап 8: Генерация файлов (80-90%)
+            # Этап 9: Генерация файлов (80-90%)
             self.update_task_status(task_id, "generating_files", "Генерация файлов субтитров...", progress_percent=85)
             
-            # Этап 9: Сохранение файлов (90-95%)
+            # Этап 10: Сохранение файлов (90-95%)
             self.update_task_status(task_id, "saving_files", "Сохранение файлов транскрипции...", progress_percent=92)
             self.save_transcription_result(task_id, result, original_filename)
 
-            # Этап 10: Очистка (95-100%)
+            # Этап 11: Очистка (95-100%)
             self.update_task_status(task_id, "cleaning_up", "Очистка временных файлов...", progress_percent=97)
 
             # Очищаем временные файлы
