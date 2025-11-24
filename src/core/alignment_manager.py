@@ -1,9 +1,5 @@
-"""
-Менеджер для работы с моделью выравнивания временных меток (WhisperX Alignment)
-"""
 import whisperx
-from typing import Optional, Callable, Tuple, Any
-
+from typing import Optional, Callable
 
 class AlignmentManager:
     """Менеджер для работы с моделью выравнивания временных меток"""

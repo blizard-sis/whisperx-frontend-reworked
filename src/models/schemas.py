@@ -8,12 +8,12 @@ from datetime import datetime
 
 class TranscriptionConfig(BaseModel):
     """Конфигурация для транскрипции"""
-    model: str = "large-v3"
+    model: str = "large-v3"  # Самая точная модель
     language: str = "ru"
-    diarize: bool = False
+    diarize: bool = True  # Диаризация включена по умолчанию
     hf_token: Optional[str] = None
-    compute_type: str = "auto"
-    batch_size: int = 16
+    compute_type: str = "float32"  # Максимальная точность
+    batch_size: int = 4  # Меньше батч = выше качество
 
 
 class TranscriptionStatus(BaseModel):

@@ -45,11 +45,12 @@ CORS_ORIGINS = [
 ]
 
 # Настройки обработки
+# 🎯 Максимальное качество (требует больше GPU памяти и времени)
 PROCESSING_CONFIG = {
     'max_workers': 2,
-    'default_model': 'large-v3',
+    'default_model': 'large-v3',  # Самая точная модель Whisper
     'default_language': 'ru',
-    'default_compute_type': 'float16',
-    'default_batch_size': 16,
-    'default_diarize': True  # Диаризация всегда включена
+    'default_compute_type': 'float32',  # Максимальная точность (вместо float16)
+    'default_batch_size': 4,  # Меньше = точнее (было 16)
+    'default_diarize': True  # Диаризация спикеров включена (автоопределение количества)
 } 

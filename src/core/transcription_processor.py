@@ -1,4 +1,3 @@
-"""Основной процессор транскрипции."""
 import json
 import subprocess
 import asyncio
@@ -58,17 +57,29 @@ class TranscriptionProcessor:
             return "cpu"
     
     def _detect_compute_type(self) -> str:
-        """Автоматическое определение compute_type для всех моделей"""
+        """Автоматическое определение compute_type для максимального качества"""
         if self.device == "cuda":
-            # Проверяем поддержку float16 на GPU
+            # Для максимального качества всегда пытаемся использовать float32 на GPU
+            # float32 даёт лучшую точность, чем float16
             try:
-                # Пробуем создать тензор float16 на GPU
-                test_tensor = torch.tensor([1.0], dtype=torch.float16, device="cuda")
-                return "float16"
-            except Exception:
-                return "float32"
+                # Проверяем доступность GPU памяти
+                import torch.cuda
+                gpu_mem_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+                print(f"🖥️ Доступно GPU памяти: {gpu_mem_gb:.2f} GB")
+                
+                # Если есть хотя бы 8GB - используем float32 для максимального качества
+                if gpu_mem_gb >= 8:
+                    print("✅ Используем float32 для максимального качества")
+                    return "float32"
+                else:
+                    # Для карт с меньшей памятью пробуем float16
+                    print("⚠️ Мало GPU памяти, используем float16")
+                    return "float16"
+            except Exception as e:
+                print(f"⚠️ Ошибка определения GPU памяти: {e}, используем int8")
+                return "int8"
         else:
-            # Для CPU используем int8 для лучшей производительности
+            # Для CPU используем int8 для производительности
             return "int8"
     
     def update_task_status(self, task_id: str, status: str, progress: str = None, error: str = None, progress_percent: int = None):
@@ -108,7 +119,7 @@ class TranscriptionProcessor:
         config: TranscriptionConfig,
         original_filename: str
     ):
-        """Синхронная обработка транскрипции"""
+        """Процедура разбора и обработки входных данных для транскрипции"""
         try:
             # Этап 1: Подготовка (0-10%)
             self.update_task_status(task_id, "preparing", "Подготовка к обработке...", progress_percent=5)
@@ -152,8 +163,8 @@ class TranscriptionProcessor:
                     status_callback=status_callback
                 )
             
-            # Загружаем Diarization если нужно
-            if config.diarize and config.hf_token and not self.diarization_manager.is_loaded:
+            # Загружаем Diarization
+            if config.hf_token and not self.diarization_manager.is_loaded:
                 self.diarization_manager.load_model(
                     hf_token=config.hf_token,
                     status_callback=status_callback
@@ -203,7 +214,6 @@ class TranscriptionProcessor:
                 summary = self.summarization_manager.create_summary(result, summarization_callback)
                 result["summary"] = summary
                 print(f"✅ Суммаризация завершена для {task_id}")
-                print(f"📝 Содержимое суммаризации: {summary}")
                 
             except Exception as e:
                 print(f"⚠️ Ошибка суммаризации (не критично): {e}")
@@ -242,7 +252,6 @@ class TranscriptionProcessor:
         config: TranscriptionConfig,
         original_filename: str
     ):
-        """Асинхронная обработка транскрипции"""
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(
             self.executor, 

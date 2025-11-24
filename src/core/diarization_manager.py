@@ -58,7 +58,7 @@ class DiarizationManager:
     
     def diarize(self, audio):
         """
-        Выполнение диаризации аудио
+        Выполнение диаризации аудио с автоопределением количества спикеров
         
         Args:
             audio: Аудио данные (numpy array)
@@ -69,7 +69,7 @@ class DiarizationManager:
         if not self.is_loaded or self.model is None:
             raise RuntimeError("Модель диаризации не загружена. Вызовите load_model() сначала.")
         
-        print("👥 Диаризация спикеров...")
+        print("👥 Диаризация спикеров (автоопределение количества)...")
         return self.model(audio)
     
     def cleanup(self):

@@ -2,7 +2,6 @@
 Менеджер для работы с моделью Whisper (транскрипция)
 """
 import threading
-import torch
 from typing import Optional, Callable
 
 import whisperx
@@ -38,7 +37,6 @@ class WhisperManager:
                     status_callback("dependency_error", error_message, 0)
                 raise RuntimeError(error_message) from dep_error
             
-            # Определяем compute_type
             if compute_type == "auto":
                 compute_type = self.compute_type
                 print(f"🔧 Автоматически выбран compute_type: {compute_type}")
