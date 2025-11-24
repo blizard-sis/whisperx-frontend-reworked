@@ -11,6 +11,7 @@ import whisperx
 
 from ..models.schemas import TranscriptionConfig
 from ..utils import DependencyValidationError, validate_whisperx_dependencies
+from .summarization_manager import SummarizationManager
 
 
 class WhisperManager:
@@ -21,12 +22,17 @@ class WhisperManager:
         self.align_model = None
         self.align_metadata = None
         self.diarize_model = None
-        self.summarization_model = None
-        self.summarization_tokenizer = None
         self.models_loaded = False
         self.loading_lock = threading.Lock()
         self.device = self._detect_device()
         self.compute_type = self._detect_compute_type()
+        
+        # Инициализируем менеджер суммаризации
+        self.summarization_manager = SummarizationManager(
+            device=self.device,
+            compute_type=self.compute_type
+        )
+        
         print(f"🔧 Обнаружено устройство: {self.device}, compute_type: {self.compute_type}")
     
     def _detect_device(self) -> str:
@@ -122,46 +128,12 @@ class WhisperManager:
             print("✅ Модели загружены успешно!")
     
     def load_summarization_model(self, model_name: str = None, status_callback: Optional[Callable] = None):
-        """Загрузка модели суммаризации"""
-        if self.summarization_model is not None:
-            print("✅ Модель суммаризации уже загружена")
-            return
-        
-        try:
-            from transformers import AutoTokenizer, AutoModelForCausalLM
-            
-            if status_callback:
-                status_callback("loading_summarization_model", "Загрузка модели суммаризации...", 75)
-            
-            model_name = model_name or os.getenv('SUMMARIZATION_MODEL', 'Qwen/Qwen2.5-7B-Instruct')
-            print(f"🤖 Загрузка модели суммаризации: {model_name}")
-            
-            # Загружаем токенайзер
-            self.summarization_tokenizer = AutoTokenizer.from_pretrained(
-                model_name,
-                trust_remote_code=True
-            )
-            
-            # Загружаем модель на доступную GPU
-            self.summarization_model = AutoModelForCausalLM.from_pretrained(
-                model_name,
-                dtype=torch.float16 if self.device == "cuda" else torch.float32,
-                device_map="auto",  # Автоматически выбирает свободную GPU
-                trust_remote_code=True
-            )
-            
-            self.summarization_model.eval()
-            print(f"✅ Модель суммаризации загружена на устройство: {self.summarization_model.device}")
-            
-        except Exception as e:
-            print(f"❌ Ошибка загрузки модели суммаризации: {e}")
-            self.summarization_model = None
-            self.summarization_tokenizer = None
-            raise
+        """Загрузка модели суммаризации через SummarizationManager"""
+        self.summarization_manager.load_model(model_name=model_name, status_callback=status_callback)
     
     def create_summary(self, transcription_result: dict, status_callback: Optional[Callable] = None) -> Dict[str, Any]:
         """
-        Создание суммаризации транскрипции
+        Создание суммаризации транскрипции через SummarizationManager
         
         Args:
             transcription_result: Результат транскрипции с сегментами
@@ -170,146 +142,9 @@ class WhisperManager:
         Returns:
             Словарь с суммаризацией
         """
-        if self.summarization_model is None:
-            self.load_summarization_model(status_callback=status_callback)
-        
-        try:
-            if status_callback:
-                status_callback("summarizing", "Создание суммаризации...", 78)
-            
-            print("📝 Подготовка данных для суммаризации...")
-            
-            # Извлекаем данные
-            segments = transcription_result.get('segments', [])
-            speakers_data = {}
-            speaker_times = {}
-            total_time = 0
-            
-            for segment in segments:
-                speaker = segment.get('speaker', 'UNKNOWN')
-                text = segment.get('text', '').strip()
-                duration = segment.get('end', 0) - segment.get('start', 0)
-                
-                if speaker not in speakers_data:
-                    speakers_data[speaker] = []
-                    speaker_times[speaker] = 0
-                
-                if text:
-                    speakers_data[speaker].append(text)
-                
-                speaker_times[speaker] += duration
-                total_time += duration
-            
-            # Вычисляем проценты
-            speaker_percentages = {}
-            for speaker, time in speaker_times.items():
-                speaker_percentages[speaker] = round((time / total_time) * 100, 2) if total_time > 0 else 0
-            
-            total_duration = segments[-1].get('end', 0) / 60 if segments else 0
-            
-            # Создаём промпт
-            prompt = self._create_summarization_prompt(speakers_data, speaker_percentages, total_duration)
-            
-            if status_callback:
-                status_callback("summarizing", "Генерация суммаризации...", 82)
-            
-            print("🤖 Запуск генерации суммаризации...")
-            summary = self._generate_summary(prompt)
-            
-            print("✅ Суммаризация создана успешно")
-            return summary
-            
-        except Exception as e:
-            print(f"❌ Ошибка создания суммаризации: {e}")
-            raise
+        return self.summarization_manager.create_summary(transcription_result, status_callback)
     
-    def _create_summarization_prompt(self, speakers_data: Dict, speaker_percentages: Dict, total_duration: float) -> str:
-        """Создание промпта для суммаризации"""
-        prompt = f"""Проанализируй следующую транскрипцию разговора и создай структурированное саммари.
 
-ИНФОРМАЦИЯ О РАЗГОВОРЕ:
-- Общая продолжительность: {total_duration:.1f} минут
-- Количество спикеров: {len(speakers_data)}
-
-ДАННЫЕ ПО СПИКЕРАМ:
-"""
-        
-        for speaker, texts in speakers_data.items():
-            percentage = speaker_percentages.get(speaker, 0)
-            prompt += f"\n--- {speaker} (говорил {percentage}% времени) ---\n"
-            prompt += "\n".join(texts[:10])  # Первые 10 фраз
-            if len(texts) > 10:
-                prompt += f"\n... и еще {len(texts) - 10} фраз"
-            prompt += "\n"
-        
-        prompt += """
-ЗАДАЧА:
-1. Определи тип разговора (деловая встреча, интервью, лекция и т.д.)
-2. Выдели ключевые моменты
-3. Проанализируй вклад каждого спикера
-4. Создай краткое резюме
-
-Ответь в формате JSON со следующей структурой:
-{
-  "conversation_type": "тип разговора",
-  "key_points": ["пункт 1", "пункт 2", ...],
-  "speakers_summary": {
-    "SPEAKER_00": "краткое описание вклада",
-    ...
-  },
-  "overall_summary": "общее резюме разговора"
-}"""
-        
-        return prompt
-    
-    def _generate_summary(self, prompt: str) -> Dict[str, Any]:
-        """Генерация суммаризации с помощью LLM"""
-        messages = [
-            {"role": "system", "content": "Ты эксперт по анализу разговоров. Отвечай только в формате JSON."},
-            {"role": "user", "content": prompt}
-        ]
-        
-        # Применяем chat template
-        text = self.summarization_tokenizer.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=True
-        )
-        
-        # Токенизируем
-        model_inputs = self.summarization_tokenizer([text], return_tensors="pt").to(self.summarization_model.device)
-        
-        # Генерируем
-        with torch.no_grad():
-            generated_ids = self.summarization_model.generate(
-                **model_inputs,
-                max_new_tokens=2048,
-                temperature=0.3,
-                do_sample=True,
-                top_p=0.9
-            )
-        
-        # Декодируем
-        generated_ids = [
-            output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
-        ]
-        
-        response = self.summarization_tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
-        
-        # Парсим JSON
-        try:
-            # Ищем JSON в ответе
-            start_idx = response.find('{')
-            end_idx = response.rfind('}') + 1
-            if start_idx != -1 and end_idx > start_idx:
-                json_str = response[start_idx:end_idx]
-                return json.loads(json_str)
-            else:
-                # Если JSON не найден, возвращаем как есть
-                return {"raw_summary": response}
-        except json.JSONDecodeError:
-            print(f"⚠️ Не удалось распарсить JSON, возвращаем сырой ответ")
-            return {"raw_summary": response}
     
     def transcribe_audio(self, audio_path: str, config: TranscriptionConfig, status_callback: Optional[Callable] = None) -> dict:
         """

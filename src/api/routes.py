@@ -18,8 +18,7 @@ from ..models.schemas import (
     TranscriptionConfig
 )
 from ..core.transcription_processor import TranscriptionProcessor
-from ..config.settings import UPLOADS_DIR, SUPPORTED_FORMATS, SUMMARIZATION_CONFIG
-from ..services.summarization_service import SummarizationService
+from ..config.settings import UPLOADS_DIR, SUPPORTED_FORMATS
 import logging
 
 logger = logging.getLogger(__name__)
@@ -30,8 +29,6 @@ router = APIRouter()
 # Глобальный процессор транскрипции
 processor = TranscriptionProcessor()
 
-# Сервис суммаризации
-summarization_service = SummarizationService()
 
 
 def build_download_links(task_id: str, db_record: Dict[str, Any]) -> Tuple[Dict[str, str], Dict[str, str]]:
@@ -354,77 +351,6 @@ async def health_check():
         "active_tasks": len([s for s in processor.task_statuses.values() if s["status"] == "processing"]),
         "supported_formats": list(SUPPORTED_FORMATS)
     }
-
-
-@router.post("/summarize/{task_id}")
-async def create_summarization(
-    task_id: str
-):
-    """
-    Создание суммаризации транскрипции
-    
-    Args:
-        task_id: ID задачи транскрипции
-        
-    Returns:
-        dict: Результат суммаризации
-    """
-    try:
-        # Получаем данные транскрипции из базы
-        db_record = processor.db_service.get_transcription(task_id)
-        
-        if not db_record:
-            raise HTTPException(status_code=404, detail="Транскрипция не найдена")
-        
-        if db_record['status'] != 'completed':
-            raise HTTPException(status_code=400, detail="Транскрипция еще не завершена")
-        
-        # Получаем локальный JSON файл
-        transcript_file = db_record.get('transcript_file')
-
-        if not transcript_file or not Path(transcript_file).exists():
-            raise HTTPException(status_code=404, detail="JSON файл транскрипции не найден")
-
-        with open(transcript_file, 'r', encoding='utf-8') as f:
-            transcription_data = json.load(f)
-        
-        # Создаем суммаризацию
-        summary = await summarization_service.create_summary(transcription_data)
-        
-        return {
-            "task_id": task_id,
-            "summary": summary,
-            "created_at": datetime.now().isoformat()
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Ошибка создания суммаризации для {task_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка создания суммаризации: {str(e)}")
-
-
-@router.get("/config/summarization")
-async def get_summarization_config():
-    """
-    Получение конфигурации суммаризации
-    
-    Returns:
-        dict: Конфигурация суммаризации для клиента
-        
-    Note:
-        Этот endpoint теперь используется только для проверки настроек.
-        Сама суммаризация выполняется на бэкенде через /summarize/{task_id}
-    """
-    return {
-        "api_url": SUMMARIZATION_CONFIG['api_url'],
-        "model": SUMMARIZATION_CONFIG['model'],
-        "max_tokens": SUMMARIZATION_CONFIG['max_tokens'],
-        "temperature": SUMMARIZATION_CONFIG['temperature'],
-        "has_api_key": bool(SUMMARIZATION_CONFIG['api_key'] and SUMMARIZATION_CONFIG['api_key'] != 'your-api-key-here'),
-        "backend_processing": True  # Указываем что обработка происходит на бэкенде
-    }
-
 
 @router.get("/")
 async def root():

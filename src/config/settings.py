@@ -52,13 +52,4 @@ PROCESSING_CONFIG = {
     'default_compute_type': 'float16',
     'default_batch_size': 16,
     'default_diarize': True  # Диаризация всегда включена
-}
-
-# Настройки суммаризации
-SUMMARIZATION_CONFIG = {
-    'api_url': os.getenv('SUMMARIZATION_API_URL', 'http://localhost:11434/v1/chat/completions'),
-    'api_key': os.getenv('SUMMARIZATION_API_KEY', 'your-api-key-here'),
-    'model': os.getenv('SUMMARIZATION_MODEL', 'llama3.1:8b'),
-    'max_tokens': int(os.getenv('SUMMARIZATION_MAX_TOKENS', '4000')),
-    'temperature': float(os.getenv('SUMMARIZATION_TEMPERATURE', '0.1'))
 } 

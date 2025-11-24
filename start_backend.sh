@@ -27,20 +27,6 @@ else
     echo "⚠️  Файл .env не найден, используются значения по умолчанию"
 fi
 
-# Вывод информации о конфигурации
-echo ""
-echo "============================================================"
-echo "📋 КОНФИГУРАЦИЯ ЗАПУСКА:"
-echo "============================================================"
-echo "  🖥️  Устройство: ${CUDA_VISIBLE_DEVICES:-auto}"
-echo "  🤖 Модель Whisper: ${WHISPERX_MODEL:-large-v3}"
-echo "  🌍 Язык: ${WHISPERX_LANGUAGE:-ru}"
-echo "  🔢 Batch Size: ${WHISPERX_BATCH_SIZE:-16}"
-echo "  🎯 Compute Type: ${WHISPERX_COMPUTE_TYPE:-float16}"
-echo "  📊 Суммаризация: ${SUMMARIZATION_MODEL:-Qwen/Qwen2.5-7B-Instruct}"
-echo "============================================================"
-echo ""
-
 # Запуск сервера
 echo "🚀 Запуск сервера на порту 8880..."
 python -m uvicorn src.main:app --host 0.0.0.0 --port 8880
