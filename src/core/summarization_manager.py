@@ -59,7 +59,7 @@ class SummarizationManager:
             # Загружаем модель на доступную GPU
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_name,
-                torch_dtype=dtype,
+                dtype=dtype,  # Используем новый параметр вместо torch_dtype
                 device_map="auto",  # Автоматически выбирает свободную GPU
                 trust_remote_code=True
             )
