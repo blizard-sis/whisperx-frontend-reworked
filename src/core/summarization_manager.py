@@ -12,21 +12,19 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 class SummarizationManager:
     """Менеджер для работы с моделью суммаризации"""
     
-    def __init__(self, device: str, compute_type: str):
+    def __init__(self, device: str):
         """
         Инициализация менеджера суммаризации
         
         Args:
             device: Устройство для работы модели (cuda/cpu)
-            compute_type: Тип вычислений (float16/float32)
         """
         self.device = device
-        self.compute_type = compute_type
         self.model = None
         self.tokenizer = None
         self.is_loaded = False
         
-        print(f"🤖 SummarizationManager инициализирован: device={device}, compute_type={compute_type}")
+        print(f"🤖 SummarizationManager инициализирован: device={device}")
     
     def load_model(self, model_name: str = None, status_callback: Optional[Callable] = None):
         """
@@ -53,14 +51,14 @@ class SummarizationManager:
                 trust_remote_code=True
             )
             
-            # Определяем dtype
-            dtype = torch.float16 if self.device == "cuda" and self.compute_type == "float16" else torch.float32
+            # Всегда используем float16 для максимальной производительности
+            dtype = torch.float16
             
             # Загружаем модель на доступную GPU
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_name,
-                dtype=dtype,  # Используем новый параметр вместо torch_dtype
-                device_map="auto",  # Автоматически выбирает свободную GPU
+                dtype=dtype,
+                device_map="auto",
                 trust_remote_code=True
             )
             

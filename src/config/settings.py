@@ -46,11 +46,11 @@ CORS_ORIGINS = [
 
 # Настройки обработки
 # 🎯 Максимальное качество (требует больше GPU памяти и времени)
+# compute_type=float16 захардкожен в коде менеджеров
 PROCESSING_CONFIG = {
     'max_workers': 2,
     'default_model': 'large-v3',
     'default_language': 'ru',
-    'default_compute_type': 'float16',
     'default_batch_size': 4,
     'default_diarize': True
 } 

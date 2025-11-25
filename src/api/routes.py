@@ -77,7 +77,6 @@ async def upload_file(
     language: str = "ru",
     diarize: bool = False,
     hf_token: Optional[str] = None,
-    compute_type: str = "float16",
     batch_size: int = 16
 ):
     """
@@ -127,13 +126,12 @@ async def upload_file(
         hf_token = os.getenv('HF_TOKEN')
         print(f"🔑 Получен HF_TOKEN из переменных окружения: {hf_token[:20] if hf_token else 'None'}...")
     
-    # Создаем конфигурацию
+    # Создаем конфигурацию (compute_type=float16 захардкожен)
     config = TranscriptionConfig(
         model=model,
         language=language,
         diarize=diarize,
         hf_token=hf_token,
-        compute_type=compute_type,
         batch_size=batch_size
     )
     

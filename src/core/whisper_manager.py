@@ -12,16 +12,15 @@ from ..utils import DependencyValidationError, validate_whisperx_dependencies
 class WhisperManager:
     """Менеджер для работы с моделью Whisper"""
     
-    def __init__(self, device: str, compute_type: str):
+    def __init__(self, device: str):
         self.model = None
         self.is_loaded = False
         self.loading_lock = threading.Lock()
         self.device = device
-        self.compute_type = compute_type
         
-        print(f"🎙️ WhisperManager инициализирован: device={self.device}, compute_type={self.compute_type}")
+        print(f"🎙️ WhisperManager инициализирован: device={self.device}")
     
-    def load_model(self, model_name: str, compute_type: str = "auto", status_callback: Optional[Callable] = None):
+    def load_model(self, model_name: str, status_callback: Optional[Callable] = None):
         """Загрузка модели Whisper"""
         with self.loading_lock:
             if self.is_loaded:
@@ -37,10 +36,6 @@ class WhisperManager:
                     status_callback("dependency_error", error_message, 0)
                 raise RuntimeError(error_message) from dep_error
             
-            if compute_type == "auto":
-                compute_type = self.compute_type
-                print(f"🔧 Автоматически выбран compute_type: {compute_type}")
-            
             if status_callback:
                 status_callback("loading_whisper_model", "Загрузка модели Whisper...", 20)
             print(f"🔧 Загрузка модели Whisper: {model_name}")
@@ -48,7 +43,7 @@ class WhisperManager:
             self.model = whisperx.load_model(
                 model_name, 
                 self.device, 
-                compute_type=compute_type
+                compute_type="float16"
             )
             
             self.is_loaded = True
@@ -92,7 +87,7 @@ class WhisperManager:
         """
         if not self.is_loaded:
             # Для real-time нужно загрузить базовую модель
-            self.load_model(model_name="base", compute_type="auto")
+            self.load_model(model_name="base")
         
         try:
             # Убеждаемся, что audio_data - это numpy array float32

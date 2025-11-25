@@ -23,23 +23,16 @@ class TranscriptionProcessor:
     """Основной процессор транскрипции"""
     
     def __init__(self):
-        # Определяем устройство и compute_type для всех моделей
+        # Определяем устройство для всех моделей (compute_type=float16 захардкожен)
         self.device = self._detect_device()
-        self.compute_type = self._detect_compute_type()
         
-        print(f"🖥️ TranscriptionProcessor: device={self.device}, compute_type={self.compute_type}")
+        print(f"🖥️ TranscriptionProcessor: device={self.device}")
         
         # Инициализируем все менеджеры с общими параметрами
-        self.whisper_manager = WhisperManager(
-            device=self.device,
-            compute_type=self.compute_type
-        )
+        self.whisper_manager = WhisperManager(device=self.device)
         self.alignment_manager = AlignmentManager(device=self.device)
         self.diarization_manager = DiarizationManager(device=self.device)
-        self.summarization_manager = SummarizationManager(
-            device=self.device,
-            compute_type=self.compute_type
-        )
+        self.summarization_manager = SummarizationManager(device=self.device)
         
         # Сервисы
         self.subtitle_generator = SubtitleGenerator()
@@ -156,7 +149,6 @@ class TranscriptionProcessor:
             if not self.whisper_manager.is_loaded:
                 self.whisper_manager.load_model(
                     model_name=config.model,
-                    compute_type=config.compute_type,
                     status_callback=status_callback
                 )
             

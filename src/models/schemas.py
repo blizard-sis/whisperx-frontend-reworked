@@ -8,18 +8,17 @@ from datetime import datetime
 
 class TranscriptionConfig(BaseModel):
     """Конфигурация для транскрипции"""
-    model: str = "large-v3"  # Самая точная модель
+    model: str = "large-v3"
     language: str = "ru"
-    diarize: bool = True  # Диаризация включена по умолчанию
+    diarize: bool = True
     hf_token: Optional[str] = None
-    compute_type: str = "float32"  # Максимальная точность
-    batch_size: int = 4  # Меньше батч = выше качество
+    batch_size: int = 4
 
 
 class TranscriptionStatus(BaseModel):
     """Статус транскрипции"""
     id: str
-    status: str  # pending, processing, completed, failed
+    status: str
     filename: str
     created_at: str
     completed_at: Optional[str] = None

@@ -55,10 +55,7 @@ def create_app() -> FastAPI:
             'HF_TOKEN': f"{os.getenv('HF_TOKEN', 'НЕ УСТАНОВЛЕНА')[:10]}..." if os.getenv('HF_TOKEN') else 'НЕ УСТАНОВЛЕНА',
             'WHISPERX_MODEL': os.getenv('WHISPERX_MODEL', 'large-v3 (по умолчанию)'),
             'WHISPERX_LANGUAGE': os.getenv('WHISPERX_LANGUAGE', 'ru (по умолчанию)'),
-            'WHISPERX_BATCH_SIZE': os.getenv('WHISPERX_BATCH_SIZE', '16 (по умолчанию)'),
-            'WHISPERX_COMPUTE_TYPE': os.getenv('WHISPERX_COMPUTE_TYPE', 'float16 (по умолчанию)'),
-            'SUMMARIZATION_API_URL': os.getenv('SUMMARIZATION_API_URL', 'НЕ УСТАНОВЛЕНА'),
-            'SUMMARIZATION_MODEL': os.getenv('SUMMARIZATION_MODEL', 'НЕ УСТАНОВЛЕНА'),
+            'WHISPERX_BATCH_SIZE': os.getenv('WHISPERX_BATCH_SIZE', '4 (по умолчанию)'),
             'LD_LIBRARY_PATH': os.getenv('LD_LIBRARY_PATH', 'НЕ УСТАНОВЛЕНА')[:100] + '...' if os.getenv('LD_LIBRARY_PATH') and len(os.getenv('LD_LIBRARY_PATH', '')) > 100 else os.getenv('LD_LIBRARY_PATH', 'НЕ УСТАНОВЛЕНА'),
         }
         
