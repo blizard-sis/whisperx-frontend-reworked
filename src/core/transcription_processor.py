@@ -25,7 +25,7 @@ class TranscriptionProcessor:
     def __init__(self):
         # Определяем устройство для всех моделей (compute_type=float16 захардкожен)
         self.device = self._detect_device()
-        
+        self.compute_type = self._detect_compute_type()
         print(f"🖥️ TranscriptionProcessor: device={self.device}")
         
         # Инициализируем все менеджеры с общими параметрами
@@ -50,34 +50,11 @@ class TranscriptionProcessor:
             return "cpu"
     
     def _detect_compute_type(self) -> str:
-        """Автоматическое определение compute_type для максимального качества"""
-        compute_type = PROCESSING_CONFIG.get('default_compute_type')
-        if not compute_type:
-            if self.device == "cuda":
-                # Для максимального качества всегда пытаемся использовать float32 на GPU
-                # float32 даёт лучшую точность, чем float16
-                try:
-                    # Проверяем доступность GPU памяти
-                    import torch.cuda
-                    gpu_mem_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
-                    print(f"🖥️ Доступно GPU памяти: {gpu_mem_gb:.2f} GB")
-                    
-                    # Если есть хотя бы 8GB - используем float32 для максимального качества
-                    if gpu_mem_gb >= 8:
-                        print("✅ Используем float32 для максимального качества")
-                        return "float32"
-                    else:
-                        # Для карт с меньшей памятью пробуем float16
-                        print("⚠️ Мало GPU памяти, используем float16")
-                        return "float16"
-                except Exception as e:
-                    print(f"⚠️ Ошибка определения GPU памяти: {e}, используем int8")
-                    return "int8"
-            else:
-                # Для CPU используем int8 для производительности
-                return "int8"
+        """Автоматическое определение compute_type для CPU и GPU"""
+        if self.device == "cuda":
+            return "float16"
         else:
-            return compute_type
+            return "int8"
     
     def update_task_status(self, task_id: str, status: str, progress: str = None, error: str = None, progress_percent: int = None):
         """Обновление статуса задачи"""
