@@ -1,11 +1,15 @@
 import json
 import subprocess
 import asyncio
+import traceback
+import whisperx
+import torch
+import soundfile
+
 from pathlib import Path
 from typing import Dict, Any
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
-import traceback
 
 from ..models.schemas import TranscriptionConfig
 from ..services.subtitle_generator import SubtitleGenerator
@@ -15,8 +19,7 @@ from ..core.alignment_manager import AlignmentManager
 from ..core.diarization_manager import DiarizationManager
 from ..core.summarization_manager import SummarizationManager
 from ..config.settings import UPLOADS_DIR, TEMP_DIR, TRANSCRIPTS_DIR, PROCESSING_CONFIG
-import whisperx
-import torch
+
 
 
 class TranscriptionProcessor:
@@ -26,7 +29,7 @@ class TranscriptionProcessor:
         # Определяем устройство для всех моделей (compute_type=float16 захардкожен)
         self.device = self._detect_device()
         self.compute_type = self._detect_compute_type()
-        print(f"🖥️ TranscriptionProcessor: device={self.device}")
+        print(f"TranscriptionProcessor: device={self.device}, compute_type={self.compute_type}")
         
         # Инициализируем все менеджеры с общими параметрами
         self.whisper_manager = WhisperManager(device=self.device)
@@ -40,7 +43,7 @@ class TranscriptionProcessor:
         self.executor = ThreadPoolExecutor(max_workers=PROCESSING_CONFIG['max_workers'])
         self.task_statuses = {}  # Статусы задач в памяти
         
-        print("🎬 TranscriptionProcessor инициализирован со всеми менеджерами")
+        print("TranscriptionProcessor инициализирован со всеми менеджерами")
     
     def _detect_device(self) -> str:
         """Определение доступного устройства для всех моделей"""
@@ -65,7 +68,7 @@ class TranscriptionProcessor:
             "error": error,
             "updated_at": datetime.now().isoformat()
         }
-        print(f"📊 Статус {task_id}: {status} ({progress_percent}%) - {progress}")
+        print(f"Статус {task_id}: {status} ({progress_percent}%) - {progress}")
     
     def get_task_status(self, task_id: str) -> Dict:
         """Получение статуса задачи"""
@@ -96,7 +99,7 @@ class TranscriptionProcessor:
         """Процедура разбора и обработки входных данных для транскрипции"""
         try:
             # Этап 1: Подготовка (0-10%)
-            self.update_task_status(task_id, "preparing", "Подготовка к обработке...", progress_percent=5)
+            self.update_task_status(task_id, "preparing", "Подготовка к обработке...", progress_percent=1)
             
             # Определяем, нужно ли извлекать аудио
             file_extension = file_path.suffix.lower().lstrip('.')
@@ -116,7 +119,7 @@ class TranscriptionProcessor:
                 processing_file = file_path
             
             # Этап 3: Загрузка моделей (20-30%)
-            self.update_task_status(task_id, "loading_models", "Загрузка моделей...", progress_percent=22)
+            self.update_task_status(task_id, "loading_models", "Загрузка моделей...", progress_percent=20)
             
             # Создаем callback для обновления статуса
             def status_callback(status, message, percent):
@@ -144,31 +147,48 @@ class TranscriptionProcessor:
                 )
             
             # Этап 4: Загрузка аудио (30-35%)
-            self.update_task_status(task_id, "loading_audio", "Загрузка аудио файла...", progress_percent=32)
+            self.update_task_status(task_id, "loading_audio", "Загрузка аудио файла...", progress_percent=30)
             print(f"🎵 Загрузка аудио файла: {processing_file}")
             audio = whisperx.load_audio(str(processing_file))
-            
+
+            # Сохраняем аудио в WAV формате для последующего воспроизведения
+            audio_wav_path = TRANSCRIPTS_DIR / f"{task_id}_{Path(original_filename).stem}.wav"
+            print(f"💾 Сохранение аудио в WAV: {audio_wav_path}")
+            soundfile.write(str(audio_wav_path), audio, 16000)
+            print(f"✅ Аудио сохранено: {audio_wav_path}")
+
             # Этап 5: Транскрипция (35-60%)
-            result = self.whisper_manager.transcribe(
-                audio=audio,
-                batch_size=config.batch_size,
-                language=config.language,
-                status_callback=status_callback
-            )
+            if self.whisper_manager.is_loaded:
+                self.update_task_status(task_id, "transcribing", "Выполнение транскрипции...", progress_percent=35)
+                result = self.whisper_manager.transcribe(
+                    audio=audio,
+                    batch_size=config.batch_size,
+                    language=config.language,
+                    status_callback=status_callback
+                )
+                # Сохраняем результат после транскрипции
+                debug_transcribe_path = TRANSCRIPTS_DIR / f"{task_id}_{Path(original_filename).stem}_step5_transcribe.json"
+                with open(debug_transcribe_path, "w", encoding="utf-8") as f:
+                    json.dump(result, f, ensure_ascii=False, indent=2)
+                print(f"🔍 DEBUG: Результат транскрипции сохранён: {debug_transcribe_path}")
             
             # Этап 6: Выравнивание (60-70%)
             if self.alignment_manager.is_loaded:
+                self.update_task_status(task_id, "aligning", "Выполнение выравнивания...", progress_percent=50)
                 result = self.alignment_manager.align(
                     segments=result["segments"],
                     audio=audio,
                     status_callback=status_callback
                 )
+                # Сохраняем результат после выравнивания
+                debug_align_path = TRANSCRIPTS_DIR / f"{task_id}_{Path(original_filename).stem}_step6_align.json"
+                with open(debug_align_path, "w", encoding="utf-8") as f:
+                    json.dump(result, f, ensure_ascii=False, indent=2)
+                print(f"🔍 DEBUG: Результат выравнивания сохранён: {debug_align_path}")
             
             # Этап 7: Диаризация (70-75%)
-            if config.diarize and self.diarization_manager.is_loaded:
-                self.update_task_status(task_id, "diarizing", "Диаризация спикеров...", progress_percent=72)
-                
-                # Получаем сегменты диаризации и эмбеддинги голосов
+            if self.diarization_manager.is_loaded:
+                self.update_task_status(task_id, "diarizing", "Диаризация спикеров...", progress_percent=65)
                 diarize_segments, speaker_embeddings = self.diarization_manager.diarize(audio)
                 
                 # Назначаем спикеров с fill_nearest=True для максимального покрытия
@@ -178,6 +198,11 @@ class TranscriptionProcessor:
                     speaker_embeddings=speaker_embeddings,
                     fill_nearest=True  # Назначать ближайшего спикера даже без точного перекрытия
                 )
+                # Сохраняем результат после диаризации
+                debug_diarize_path = TRANSCRIPTS_DIR / f"{task_id}_{Path(original_filename).stem}_step7_diarize.json"
+                with open(debug_diarize_path, "w", encoding="utf-8") as f:
+                    json.dump(result, f, ensure_ascii=False, indent=2)
+                print(f"🔍 DEBUG: Результат диаризации сохранён: {debug_diarize_path}")
             
             # Добавляем метаданные
             result["created_at"] = datetime.now().isoformat()
@@ -257,9 +282,9 @@ class TranscriptionProcessor:
         # Фиксируем пути к созданным файлам
         local_files = {fmt: str(Path(path)) for fmt, path in subtitle_files.items()}
 
-        # Сохраняем оригинальный файл
-        original_files = list(UPLOADS_DIR.glob(f"{task_id}_*"))
-        original_file_path = str(original_files[0]) if original_files else None
+        # Сохраняем оригинальный файл (аудио теперь в TRANSCRIPTS_DIR)
+        audio_files = list(TRANSCRIPTS_DIR.glob(f"{task_id}_*.wav"))
+        original_file_path = str(audio_files[0]) if audio_files else None
 
         # Создаем данные для базы данных (без сегментов для экономии места)
         self.update_task_status(task_id, "saving_files", "Сохранение данных в базу...", progress_percent=92)
