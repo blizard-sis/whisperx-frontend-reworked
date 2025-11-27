@@ -46,7 +46,7 @@ PROCESSING_CONFIG = {
     'whisperx_language': 'ru',                         # Язык транскрипции по умолчанию
     'whisperx_batch_size': 4,                          # Размер батча (меньше = качественнее, но медленнее)
     'default_diarize': True,                           # Включить диаризацию (разделение по спикерам) по умолчанию
-    'summarization_model': 'Qwen/Qwen2.5-7B-Instruct', # Модель для суммаризации текста
+    'summarization_model': 'Qwen/Qwen3-30B-A3B-Instruct-2507', # Модель для суммаризации текста
     'device_type': 'cuda',                             # Устройство для вычислений
     'compute_type': 'float16'                          # Тип вычислений (float16 для GPU, int8 для CPU)
 }

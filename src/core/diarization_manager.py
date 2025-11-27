@@ -41,12 +41,12 @@ class DiarizationManager:
             audio: Аудио данные (numpy array)
             
         Returns:
-            Tuple: (diarize_segments, speaker_embeddings) - результат диаризации и векторы голосов
+            Tuple: (diarize_segments) - результат диаризации
         """
         if not self.is_loaded or self.model is None:
             raise RuntimeError("Модель диаризации не загружена. Вызовите load_model() сначала.")
         
-        return self.model(audio, return_embeddings=True)
+        return self.model(audio)
     
     def cleanup(self):
         """Очистка ресурсов модели"""

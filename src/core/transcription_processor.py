@@ -239,14 +239,13 @@ class TranscriptionProcessor:
             # Этап 7: Диаризация (70-75%)
             if self.diarization_manager.is_loaded:
                 self.update_task_status(task_id, "diarizing", "Диаризация спикеров...", progress_percent=65)
-                diarize_segments, speaker_embeddings = self.diarization_manager.diarize(audio)
+                diarize_segments = self.diarization_manager.diarize(audio)
                 
                 # Назначаем спикеров с fill_nearest=True для максимального покрытия
                 result = whisperx.assign_word_speakers(
                     diarize_segments, 
                     result,
-                    speaker_embeddings=speaker_embeddings,
-                    fill_nearest=True  # Назначать ближайшего спикера даже без точного перекрытия
+                    fill_nearest=False  # Назначать ближайшего спикера даже без точного перекрытия
                 )
             
             # Очищаем результат от служебной информации
