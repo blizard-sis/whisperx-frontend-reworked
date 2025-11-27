@@ -120,22 +120,19 @@ class TranscriptionProcessor:
             # Загружаем Whisper
             if not self.whisper_manager.is_loaded:
                 self.whisper_manager.load_model(
-                    model_name=config.model,
-                    status_callback=status_callback
+                    model_name=config.model
                 )
             
             # Загружаем Alignment
             if not self.alignment_manager.is_loaded:
                 self.alignment_manager.load_model(
-                    language=config.language,
-                    status_callback=status_callback
+                    language=config.language
                 )
             
             # Загружаем Diarization
             if config.hf_token and not self.diarization_manager.is_loaded:
                 self.diarization_manager.load_model(
-                    hf_token=config.hf_token,
-                    status_callback=status_callback
+                    hf_token=config.hf_token
                 )
             
             # Этап 4: Загрузка аудио (30-35%)
