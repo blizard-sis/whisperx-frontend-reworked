@@ -113,10 +113,6 @@ class TranscriptionProcessor:
             # Этап 3: Загрузка моделей (20-30%)
             self.update_task_status(task_id, "loading_models", "Загрузка моделей...", progress_percent=20)
             
-            # Создаем callback для обновления статуса
-            def status_callback(status, message, percent):
-                self.update_task_status(task_id, status, message, progress_percent=percent)
-            
             # Загружаем Whisper
             if not self.whisper_manager.is_loaded:
                 self.whisper_manager.load_model(
@@ -153,7 +149,6 @@ class TranscriptionProcessor:
                     audio=audio,
                     batch_size=config.batch_size,
                     language=config.language,
-                    status_callback=status_callback
                 )
                 # Сохраняем результат после транскрипции
                 debug_transcribe_path = TRANSCRIPTS_DIR / f"{task_id}_{Path(original_filename).stem}_step5_transcribe.json"
@@ -167,7 +162,6 @@ class TranscriptionProcessor:
                 result = self.alignment_manager.align(
                     segments=result["segments"],
                     audio=audio,
-                    status_callback=status_callback
                 )
                 # Сохраняем результат после выравнивания
                 debug_align_path = TRANSCRIPTS_DIR / f"{task_id}_{Path(original_filename).stem}_step6_align.json"
