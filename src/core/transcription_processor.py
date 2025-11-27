@@ -44,6 +44,83 @@ class TranscriptionProcessor:
         
         print("🎬 TranscriptionProcessor инициализирован со всеми менеджерами")
     
+    @staticmethod
+    def _clean_transcription_result(result: dict) -> dict:
+        """
+        Очищает результат транскрипции от служебной информации
+        """
+        # Создаём копию результата
+        cleaned_result = result.copy()
+        
+        # 1. Удаляем word_segments
+        if 'word_segments' in cleaned_result:
+            del cleaned_result['word_segments']
+            print("✂️ Удалено: word_segments")
+        
+        # 2. Удаляем speaker_embeddings
+        if 'speaker_embeddings' in cleaned_result:
+            del cleaned_result['speaker_embeddings']
+            print("✂️ Удалено: speaker_embeddings")
+        
+        # 3. Удаляем words из каждого segment
+        if 'segments' in cleaned_result:
+            for segment in cleaned_result['segments']:
+                if 'words' in segment:
+                    del segment['words']
+            print(f"✂️ Удалено: words из {len(cleaned_result['segments'])} segments")
+        
+        return cleaned_result
+    
+    @staticmethod
+    def _merge_consecutive_speaker_segments(result: dict) -> dict:
+        """
+        Объединяет последовательные сегменты одного и того же спикера
+        """
+        if 'segments' not in result or not result['segments']:
+            return result
+        
+        segments = result['segments']
+        merged_segments = []
+        
+        current_segment = None
+        
+        for segment in segments:
+            speaker = segment.get('speaker')
+            
+            # Если текущего сегмента нет или спикер изменился
+            if current_segment is None or current_segment.get('speaker') != speaker:
+                # Сохраняем предыдущий сегмент
+                if current_segment is not None:
+                    merged_segments.append(current_segment)
+                
+                # Начинаем новый сегмент
+                current_segment = {
+                    'start': segment['start'],
+                    'end': segment['end'],
+                    'text': segment['text'],
+                    'speaker': speaker
+                }
+            else:
+                # Объединяем с текущим сегментом
+                current_segment['end'] = segment['end']
+                # Объединяем текст, убирая лишние пробелы
+                current_text = current_segment['text'].rstrip()
+                new_text = segment['text'].lstrip()
+                current_segment['text'] = f"{current_text} {new_text}"
+        
+        # Добавляем последний сегмент
+        if current_segment is not None:
+            merged_segments.append(current_segment)
+        
+        original_count = len(segments)
+        merged_count = len(merged_segments)
+        reduction = original_count - merged_count
+        
+        print(f"🔗 Объединено сегментов: {original_count} → {merged_count} (уменьшение на {reduction})")
+        
+        result['segments'] = merged_segments
+        return result
+    
     def _detect_device(self) -> str:
         """Определение доступного устройства для всех моделей"""
         if PROCESSING_CONFIG['device_type'] == "cuda" and torch.cuda.is_available():
@@ -150,11 +227,6 @@ class TranscriptionProcessor:
                     batch_size=config.batch_size,
                     language=config.language,
                 )
-                # Сохраняем результат после транскрипции
-                debug_transcribe_path = TRANSCRIPTS_DIR / f"{task_id}_{Path(original_filename).stem}_step5_transcribe.json"
-                with open(debug_transcribe_path, "w", encoding="utf-8") as f:
-                    json.dump(result, f, ensure_ascii=False, indent=2)
-                print(f"🔍 DEBUG: Результат транскрипции сохранён: {debug_transcribe_path}")
             
             # Этап 6: Выравнивание (60-70%)
             if self.alignment_manager.is_loaded:
@@ -163,11 +235,6 @@ class TranscriptionProcessor:
                     segments=result["segments"],
                     audio=audio,
                 )
-                # Сохраняем результат после выравнивания
-                debug_align_path = TRANSCRIPTS_DIR / f"{task_id}_{Path(original_filename).stem}_step6_align.json"
-                with open(debug_align_path, "w", encoding="utf-8") as f:
-                    json.dump(result, f, ensure_ascii=False, indent=2)
-                print(f"🔍 DEBUG: Результат выравнивания сохранён: {debug_align_path}")
             
             # Этап 7: Диаризация (70-75%)
             if self.diarization_manager.is_loaded:
@@ -181,11 +248,18 @@ class TranscriptionProcessor:
                     speaker_embeddings=speaker_embeddings,
                     fill_nearest=True  # Назначать ближайшего спикера даже без точного перекрытия
                 )
-                # Сохраняем результат после диаризации
-                debug_diarize_path = TRANSCRIPTS_DIR / f"{task_id}_{Path(original_filename).stem}_step7_diarize.json"
-                with open(debug_diarize_path, "w", encoding="utf-8") as f:
-                    json.dump(result, f, ensure_ascii=False, indent=2)
-                print(f"🔍 DEBUG: Результат диаризации сохранён: {debug_diarize_path}")
+            
+            # Очищаем результат от служебной информации
+            self.update_task_status(task_id, "cleaning_result", "Очистка результата...", progress_percent=73)
+            print("🧽 Очистка результата от служебных данных...")
+            result = self._clean_transcription_result(result)
+            print("✅ Результат очищен")
+            
+            # Объединяем последовательные сегменты одного спикера
+            self.update_task_status(task_id, "merging_segments", "Объединение сегментов...", progress_percent=74)
+            print("🔗 Объединение последовательных сегментов одного спикера...")
+            result = self._merge_consecutive_speaker_segments(result)
+            print("✅ Сегменты объединены")
             
             # Добавляем метаданные
             result["created_at"] = datetime.now().isoformat()
