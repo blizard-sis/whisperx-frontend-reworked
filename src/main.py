@@ -49,14 +49,17 @@ def create_app() -> FastAPI:
         print("📋 ПЕРЕМЕННЫЕ ОКРУЖЕНИЯ:")
         print("="*60)
         
+        from .config.settings import MODEL_CONFIG, HF_TOKEN
+        
         # Важные переменные
         env_vars = {
             'CUDA_VISIBLE_DEVICES': os.getenv('CUDA_VISIBLE_DEVICES', 'НЕ УСТАНОВЛЕНА'),
-            'HF_TOKEN': f"{os.getenv('HF_TOKEN', 'НЕ УСТАНОВЛЕНА')[:10]}..." if os.getenv('HF_TOKEN') else 'НЕ УСТАНОВЛЕНА',
-            'WHISPERX_MODEL': os.getenv('WHISPERX_MODEL', 'large-v3 (по умолчанию)'),
-            'WHISPERX_LANGUAGE': os.getenv('WHISPERX_LANGUAGE', 'ru (по умолчанию)'),
-            'WHISPERX_BATCH_SIZE': os.getenv('WHISPERX_BATCH_SIZE', '4 (по умолчанию)'),
-            'LD_LIBRARY_PATH': os.getenv('LD_LIBRARY_PATH', 'НЕ УСТАНОВЛЕНА')[:100] + '...' if os.getenv('LD_LIBRARY_PATH') and len(os.getenv('LD_LIBRARY_PATH', '')) > 100 else os.getenv('LD_LIBRARY_PATH', 'НЕ УСТАНОВЛЕНА'),
+            'HF_TOKEN': f"{HF_TOKEN[:10]}..." if HF_TOKEN else 'НЕ УСТАНОВЛЕНА',
+            'WHISPERX_MODEL': MODEL_CONFIG['whisperx_model'],
+            'WHISPERX_LANGUAGE': MODEL_CONFIG['whisperx_language'],
+            'WHISPERX_BATCH_SIZE': MODEL_CONFIG['whisperx_batch_size'],
+            'WHISPERX_COMPUTE_TYPE': MODEL_CONFIG['compute_type'] + ' (захардкожено)',
+            'SUMMARIZATION_MODEL': MODEL_CONFIG['summarization_model'],
         }
         
         for key, value in env_vars.items():

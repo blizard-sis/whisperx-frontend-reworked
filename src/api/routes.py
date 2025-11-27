@@ -1,13 +1,10 @@
 """API роуты для транскрипции."""
 import json
 import uuid
+import logging
 from pathlib import Path
 from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime
-import tempfile
-import shutil
-import os
-
 from fastapi import APIRouter, File, UploadFile, HTTPException, BackgroundTasks, Query
 from fastapi.responses import FileResponse
 
@@ -19,7 +16,6 @@ from ..models.schemas import (
 )
 from ..core.transcription_processor import TranscriptionProcessor
 from ..config.settings import UPLOADS_DIR, SUPPORTED_FORMATS
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +24,6 @@ router = APIRouter()
 
 # Глобальный процессор транскрипции
 processor = TranscriptionProcessor()
-
-
 
 def build_download_links(task_id: str, db_record: Dict[str, Any]) -> Tuple[Dict[str, str], Dict[str, str]]:
     """Формирует ссылки для скачивания файлов и совместимые s3_links."""
@@ -121,10 +115,11 @@ async def upload_file(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка сохранения файла: {str(e)}")
     
-    # Если HF токен не передан в запросе, берем из переменных окружения
+    # Если HF токен не передан в запросе, берем из настроек
     if hf_token is None and diarize:
-        hf_token = os.getenv('HF_TOKEN')
-        print(f"🔑 Получен HF_TOKEN из переменных окружения: {hf_token[:20] if hf_token else 'None'}...")
+        from ..config.settings import HF_TOKEN
+        hf_token = HF_TOKEN
+        print(f"🔑 Получен HF_TOKEN из настроек: {hf_token[:20] if hf_token else 'None'}...")
     
     # Создаем конфигурацию (compute_type=float16 захардкожен)
     config = TranscriptionConfig(

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Скрипт запуска WhisperX Backend
 
-echo "🚀 Запуск WhisperX Backend..."
+echo "Запуск WhisperX Backend..."
 
 # Переход в директорию проекта
 cd "$(dirname "$0")"

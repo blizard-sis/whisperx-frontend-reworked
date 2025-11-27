@@ -34,23 +34,20 @@ SERVER_CONFIG = {
 
 # CORS настройки
 CORS_ORIGINS = [
-    "http://localhost:8000",
-    "http://localhost:8880",
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
-    "http://0.0.0.0:8000",
-    "http://localhost:8880",
-    "http://127.0.0.1:8880",
     "*"
 ]
 
 # Настройки обработки
-# 🎯 Максимальное качество (требует больше GPU памяти и времени)
-# compute_type=float16 захардкожен в коде менеджеров
 PROCESSING_CONFIG = {
-    'max_workers': 2,
-    'default_model': 'large-v3',
-    'default_language': 'ru',
-    'default_batch_size': 4,
-    'default_diarize': True
-} 
+    'max_workers': 4,
+    'whisperx_model': 'large-v3',
+    'whisperx_language': 'ru',
+    'whisperx_batch_size': 4,
+    'default_diarize': True,
+    'summarization_model': 'Qwen/Qwen2.5-7B-Instruct',
+    'compute_type': 'float16'
+}
+
+# Секретные ключи (загружаются из .env)
+HF_TOKEN = os.getenv('HF_TOKEN')
+JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY') 

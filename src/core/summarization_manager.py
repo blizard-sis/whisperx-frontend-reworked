@@ -42,7 +42,9 @@ class SummarizationManager:
             if status_callback:
                 status_callback("loading_summarization_model", "Загрузка модели суммаризации...", 75)
             
-            model_name = model_name or os.getenv('SUMMARIZATION_MODEL', 'Qwen/Qwen2.5-7B-Instruct')
+            if model_name is None:
+                from ..config.settings import MODEL_CONFIG
+                model_name = MODEL_CONFIG['summarization_model']
             print(f"🤖 Загрузка модели суммаризации: {model_name}")
             
             # Загружаем токенайзер
