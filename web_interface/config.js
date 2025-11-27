@@ -28,13 +28,13 @@ const CONFIG = {
         SHOW_TIMESTAMPS: true // Показывать временные метки по умолчанию
     },
 
-    // Настройки транскрипции по умолчанию
+    // Настройки транскрипции по умолчанию (соответствуют src/config/settings.py)
     TRANSCRIPTION: {
         DEFAULT_MODEL: 'large-v3',
         DEFAULT_LANGUAGE: 'ru',
-        DEFAULT_DIARIZE: false,
-        DEFAULT_COMPUTE_TYPE: 'auto',
-        DEFAULT_BATCH_SIZE: 16,
+        DEFAULT_DIARIZE: true,  // Включено по умолчанию на сервере
+        DEFAULT_COMPUTE_TYPE: 'float16',  // Захардкожено на сервере
+        DEFAULT_BATCH_SIZE: 4,  // Соответствует серверу
         MODELS: [
             { value: 'large-v3', label: 'Large-v3 (лучшее качество)' },
             { value: 'medium', label: 'Medium (быстрее)' },

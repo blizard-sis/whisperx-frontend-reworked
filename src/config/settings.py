@@ -37,15 +37,17 @@ CORS_ORIGINS = [
     "*"
 ]
 
-# Настройки обработки
+# Настройки обработки транскрипции
+# Все настройки моделей, языков и параметров обработки собраны здесь
+# Используются в: TranscriptionProcessor, WhisperManager, SummarizationManager
 PROCESSING_CONFIG = {
-    'max_workers': 4,
-    'whisperx_model': 'large-v3',
-    'whisperx_language': 'ru',
-    'whisperx_batch_size': 4,
-    'default_diarize': True,
-    'summarization_model': 'Qwen/Qwen2.5-7B-Instruct',
-    'compute_type': 'float16'
+    'max_workers': 4,                                  # Количество параллельных задач транскрипции
+    'whisperx_model': 'large-v3',                      # Модель Whisper (tiny/base/small/medium/large-v3)
+    'whisperx_language': 'ru',                         # Язык транскрипции по умолчанию
+    'whisperx_batch_size': 4,                          # Размер батча (меньше = качественнее, но медленнее)
+    'default_diarize': True,                           # Включить диаризацию (разделение по спикерам) по умолчанию
+    'summarization_model': 'Qwen/Qwen2.5-7B-Instruct', # Модель для суммаризации текста
+    'compute_type': 'float16'                          # Тип вычислений (float16 для GPU, захардкожено)
 }
 
 # Секретные ключи (загружаются из .env)

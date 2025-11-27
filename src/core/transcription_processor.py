@@ -26,10 +26,10 @@ class TranscriptionProcessor:
     """Основной процессор транскрипции"""
     
     def __init__(self):
-        # Определяем устройство для всех моделей (compute_type=float16 захардкожен)
+        # Определяем устройство для всех моделей
         self.device = self._detect_device()
-        self.compute_type = self._detect_compute_type()
-        print(f"TranscriptionProcessor: device={self.device}, compute_type={self.compute_type}")
+        self.compute_type = PROCESSING_CONFIG['compute_type']
+        print(f"🖥️ TranscriptionProcessor: device={self.device}, compute_type={self.compute_type}")
         
         # Инициализируем все менеджеры с общими параметрами
         self.whisper_manager = WhisperManager(device=self.device)
@@ -43,7 +43,7 @@ class TranscriptionProcessor:
         self.executor = ThreadPoolExecutor(max_workers=PROCESSING_CONFIG['max_workers'])
         self.task_statuses = {}  # Статусы задач в памяти
         
-        print("TranscriptionProcessor инициализирован со всеми менеджерами")
+        print("🎬 TranscriptionProcessor инициализирован со всеми менеджерами")
     
     def _detect_device(self) -> str:
         """Определение доступного устройства для всех моделей"""
@@ -51,13 +51,6 @@ class TranscriptionProcessor:
             return "cuda"
         else:
             return "cpu"
-    
-    def _detect_compute_type(self) -> str:
-        """Автоматическое определение compute_type для CPU и GPU"""
-        if self.device == "cuda":
-            return "float16"
-        else:
-            return "int8"
     
     def update_task_status(self, task_id: str, status: str, progress: str = None, error: str = None, progress_percent: int = None):
         """Обновление статуса задачи"""

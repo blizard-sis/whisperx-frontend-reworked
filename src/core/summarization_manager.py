@@ -43,8 +43,8 @@ class SummarizationManager:
                 status_callback("loading_summarization_model", "Загрузка модели суммаризации...", 75)
             
             if model_name is None:
-                from ..config.settings import MODEL_CONFIG
-                model_name = MODEL_CONFIG['summarization_model']
+                from ..config.settings import PROCESSING_CONFIG
+                model_name = PROCESSING_CONFIG['summarization_model']
             print(f"🤖 Загрузка модели суммаризации: {model_name}")
             
             # Загружаем токенайзер

@@ -49,17 +49,18 @@ def create_app() -> FastAPI:
         print("📋 ПЕРЕМЕННЫЕ ОКРУЖЕНИЯ:")
         print("="*60)
         
-        from .config.settings import MODEL_CONFIG, HF_TOKEN
+        from .config.settings import PROCESSING_CONFIG, HF_TOKEN
         
         # Важные переменные
         env_vars = {
             'CUDA_VISIBLE_DEVICES': os.getenv('CUDA_VISIBLE_DEVICES', 'НЕ УСТАНОВЛЕНА'),
             'HF_TOKEN': f"{HF_TOKEN[:10]}..." if HF_TOKEN else 'НЕ УСТАНОВЛЕНА',
-            'WHISPERX_MODEL': MODEL_CONFIG['whisperx_model'],
-            'WHISPERX_LANGUAGE': MODEL_CONFIG['whisperx_language'],
-            'WHISPERX_BATCH_SIZE': MODEL_CONFIG['whisperx_batch_size'],
-            'WHISPERX_COMPUTE_TYPE': MODEL_CONFIG['compute_type'] + ' (захардкожено)',
-            'SUMMARIZATION_MODEL': MODEL_CONFIG['summarization_model'],
+            'WHISPERX_MODEL': PROCESSING_CONFIG['whisperx_model'],
+            'WHISPERX_LANGUAGE': PROCESSING_CONFIG['whisperx_language'],
+            'WHISPERX_BATCH_SIZE': PROCESSING_CONFIG['whisperx_batch_size'],
+            'WHISPERX_COMPUTE_TYPE': PROCESSING_CONFIG['compute_type'] + ' (захардкожено)',
+            'SUMMARIZATION_MODEL': PROCESSING_CONFIG['summarization_model'],
+            'MAX_WORKERS': PROCESSING_CONFIG['max_workers'],
         }
         
         for key, value in env_vars.items():
