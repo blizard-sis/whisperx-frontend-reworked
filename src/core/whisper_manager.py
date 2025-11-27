@@ -1,9 +1,4 @@
-"""
-Менеджер для работы с моделью Whisper (транскрипция)
-"""
 import threading
-from typing import Optional, Callable
-
 import whisperx
 
 from ..utils import DependencyValidationError, validate_whisperx_dependencies
@@ -17,39 +12,25 @@ class WhisperManager:
         self.is_loaded = False
         self.loading_lock = threading.Lock()
         self.device = device
-        
-        print(f"🎙️ WhisperManager инициализирован: device={self.device}")
-    
-    def load_model(self, model_name: str, status_callback: Optional[Callable] = None):
+            
+    def load_model(self, model_name: str):
         """Загрузка модели Whisper"""
         with self.loading_lock:
-            if self.is_loaded:
-                print("✅ Модель Whisper уже загружена")
-                return
 
             try:
                 validate_whisperx_dependencies()
             except DependencyValidationError as dep_error:
                 error_message = str(dep_error)
-                print(f"❌ Ошибка проверки зависимостей WhisperX: {error_message}")
-                if status_callback:
-                    status_callback("dependency_error", error_message, 0)
-                raise RuntimeError(error_message) from dep_error
-            
-            if status_callback:
-                status_callback("loading_whisper_model", "Загрузка модели Whisper...", 20)
-            print(f"🔧 Загрузка модели Whisper: {model_name}")
+                raise RuntimeError(f"Не удалось загрузить модель Whisper из-за отсутствующих зависимостей: {error_message}") from dep_error
             
             self.model = whisperx.load_model(
                 model_name, 
                 self.device, 
                 compute_type="float16"
             )
-            
             self.is_loaded = True
-            print("✅ Модель Whisper загружена успешно!")
     
-    def transcribe(self, audio, batch_size: int = 16, language: str = "ru", status_callback: Optional[Callable] = None) -> dict:
+    def transcribe(self, audio, batch_size: int = 16, language: str = "ru") -> dict:
         """
         Выполнение транскрипции аудио
         
@@ -57,7 +38,6 @@ class WhisperManager:
             audio: Аудио данные (numpy array)
             batch_size: Размер батча
             language: Язык для транскрипции
-            status_callback: Callback для обновления статуса
         
         Returns:
             Результат транскрипции
@@ -65,13 +45,7 @@ class WhisperManager:
         if not self.is_loaded:
             raise RuntimeError("Модель Whisper не загружена. Вызовите load_model() сначала.")
         
-        if status_callback:
-            status_callback("transcribing", "Выполнение транскрипции...", 45)
-        
-        print(f"🎯 Выполнение транскрипции (язык: {language})...")
-        result = self.model.transcribe(audio, batch_size=batch_size, language=language)
-        
-        return result
+        return self.model.transcribe(audio, batch_size=batch_size, language=language)
     
     async def transcribe_chunk(self, audio_data, sample_rate: int = 16000, language: str = "ru") -> str:
         """
@@ -115,7 +89,6 @@ class WhisperManager:
                         text_parts.append(segment["text"].strip())
                 
                 return " ".join(text_parts).strip()
-            
             return ""
             
         except Exception as e:
@@ -129,4 +102,3 @@ class WhisperManager:
             self.model = None
         
         self.is_loaded = False
-        print("🧹 WhisperManager очищен")

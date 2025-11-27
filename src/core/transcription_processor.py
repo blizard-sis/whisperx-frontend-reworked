@@ -21,7 +21,6 @@ from ..core.summarization_manager import SummarizationManager
 from ..config.settings import UPLOADS_DIR, TEMP_DIR, TRANSCRIPTS_DIR, PROCESSING_CONFIG
 
 
-
 class TranscriptionProcessor:
     """Основной процессор транскрипции"""
     
@@ -47,7 +46,7 @@ class TranscriptionProcessor:
     
     def _detect_device(self) -> str:
         """Определение доступного устройства для всех моделей"""
-        if torch.cuda.is_available():
+        if PROCESSING_CONFIG['device_type'] == "cuda" and torch.cuda.is_available():
             return "cuda"
         else:
             return "cpu"
